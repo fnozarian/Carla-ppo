@@ -49,7 +49,7 @@ class CarlaLapEnv(gym.Env):
                  viewer_res=(1280, 720), obs_res=(1280, 720),
                  reward_fn=None, encode_state_fn=None, 
                  synchronous=True, fps=30, action_smoothing=0.9,
-                 start_carla=True):
+                 start_carla=False):
         """
             Initializes a gym-like environment that can be used to interact with CARLA.
 
@@ -93,19 +93,21 @@ class CarlaLapEnv(gym.Env):
 
         # Start CARLA from CARLA_ROOT
         self.carla_process = None
+        self.frame = None
         if start_carla:
             if "CARLA_ROOT" not in os.environ:
                 raise Exception("${CARLA_ROOT} has not been set!")
-            dist_dir = os.path.join(os.environ["CARLA_ROOT"], "Dist")
-            if not os.path.isdir(dist_dir):
-                raise Exception("Expected to find directory \"Dist\" under ${CARLA_ROOT}!")
-            sub_dirs = [os.path.join(dist_dir, sub_dir) for sub_dir in os.listdir(dist_dir) if os.path.isdir(os.path.join(dist_dir, sub_dir))]
-            if len(sub_dirs) == 0:
-                raise Exception("Could not find a packaged distribution of CALRA! " +
-                                "(try building CARLA with the \"make package\" " +
-                                "command in ${CARLA_ROOT})")
-            sub_dir = sub_dirs[0]
-            carla_path = os.path.join(sub_dir, "LinuxNoEditor", "CarlaUE4.sh")
+            # dist_dir = os.path.join(os.environ["CARLA_ROOT"], "Dist")
+            # if not os.path.isdir(dist_dir):
+            #     raise Exception("Expected to find directory \"Dist\" under ${CARLA_ROOT}!")
+            # sub_dirs = [os.path.join(dist_dir, sub_dir) for sub_dir in os.listdir(dist_dir) if os.path.isdir(os.path.join(dist_dir, sub_dir))]
+            # if len(sub_dirs) == 0:
+            #     raise Exception("Could not find a packaged distribution of CALRA! " +
+            #                     "(try building CARLA with the \"make package\" " +
+            #                     "command in ${CARLA_ROOT})")
+            # sub_dir = sub_dirs[0]
+            # carla_path = os.path.join(sub_dir, "LinuxNoEditor", "CarlaUE4.sh")
+            carla_path = os.path.join(os.environ["CARLA_ROOT"], "CarlaUE4.sh")
             launch_command = [carla_path]
             launch_command += ["Town07"]
             if synchronous: launch_command += ["-benchmark"]
@@ -117,7 +119,7 @@ class CarlaLapEnv(gym.Env):
             for line in self.carla_process.stdout:
                 if "LogCarla: Number Of Vehicles" in line:
                     break
-            time.sleep(2)
+            time.sleep(5)
 
         # Initialize pygame for visualization
         pygame.init()
@@ -156,8 +158,8 @@ class CarlaLapEnv(gym.Env):
                 self.world.apply_settings(settings)
 
             # Get spawn location
-            #lap_start_wp = self.world.map.get_waypoint(carla.Location(x=-180.0, y=110))
-            lap_start_wp = self.world.map.get_waypoint(self.world.map.get_spawn_points()[1].location)
+            lap_start_wp = self.world.map.get_waypoint(carla.Location(x=-180.0, y=110))
+            # lap_start_wp = self.world.map.get_waypoint(self.world.map.get_spawn_points()[1].location)
             spawn_transform = lap_start_wp.transform
             spawn_transform.location += carla.Location(z=1.0)
 
@@ -199,6 +201,7 @@ class CarlaLapEnv(gym.Env):
 
     def reset(self, is_training=True):
         # Do a soft reset (teleport vehicle)
+        self.vehicle.set_simulate_physics(False) # Reset the car's physics
         self.vehicle.control.steer = float(0.0)
         self.vehicle.control.throttle = float(0.0)
         #self.vehicle.control.brake = float(0.0)
@@ -214,7 +217,6 @@ class CarlaLapEnv(gym.Env):
         transform = waypoint.transform
         transform.location += carla.Location(z=1.0)
         self.vehicle.set_transform(transform)
-        self.vehicle.set_simulate_physics(False) # Reset the car's physics
         self.vehicle.set_simulate_physics(True)
 
         # Give 2 seconds to reset
@@ -342,7 +344,11 @@ class CarlaLapEnv(gym.Env):
             self.clock.tick()
             while True:
                 try:
-                    self.world.wait_for_tick(seconds=1.0/self.fps + 0.1)
+                    timestamp = self.world.wait_for_tick(seconds=1.0/self.fps + 0.1)
+                    if self.frame is not None:
+                        if timestamp.frame_count != self.frame + 1:
+                            print('frame skip!')
+                    self.frame = timestamp.frame_count
                     break
                 except:
                     # Timeouts happen occasionally for some reason, however, they seem to be fine to ignore

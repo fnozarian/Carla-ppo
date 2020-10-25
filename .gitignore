@@ -109,3 +109,6 @@ venv.bak/
 # model folders
 /models/*
 !/models/pretrained_agent/
+/.idea/
+/vae/models/
+/vae/models_org/

@@ -1,0 +1,3 @@
+gym==0.12.0
+opencv-python==4.0.0.21
+tensorflow-gpu==1.13.1

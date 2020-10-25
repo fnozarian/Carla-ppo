@@ -70,12 +70,22 @@ def image_to_city_scapes(image):
             img[j, i] = classes[segimg[j, i]]
     return img / 255
 
+
+for i in range(100):
+    image = preprocess_rgb_frame(np.asarray(Image.open(f"data/rgb/{str(i * 10)}.png")))
+    seeded_z = vae.sess.run(vae.sample, feed_dict={vae.source_states: [image]})[0]
+    generated_image = vae.generate_from_latent([seeded_z])[0].reshape(source_shape[0], source_shape[1],
+                                                                      target_shape[-1])
+    generated_image = image_to_city_scapes(generated_image)
+    plt.imsave(f'ts/{str(i)}_ppo.png', generated_image)
+
+
 fig, ax = plt.subplots(min(16, args.z_dim), int(np.ceil(args.z_dim / 16)), sharex=True, figsize=(12, 12))
 
 if len(ax.shape) == 1:
     ax = np.expand_dims(ax, axis=-1)
 
-seeded_z = vae.sess.run(vae.sample, feed_dict={vae.source_states: [image]})[0]
+
 for k in range(int(np.ceil(args.z_dim / 16))):
     for i in range(16):
         z_index = i + k * 16

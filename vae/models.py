@@ -160,7 +160,9 @@ class VAE():
 
     def init_session(self, sess=None, init_logging=True):
         if sess is None:
-            self.sess = tf.Session()
+            config = tf.ConfigProto()
+            config.gpu_options.allow_growth = True
+            self.sess = tf.Session(config=config)
             self.sess.run(tf.global_variables_initializer())
         else:
             self.sess = sess
